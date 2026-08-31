@@ -1,8 +1,9 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, LiveServerMessage, Modality } from "@google/genai";
 import dotenv from "dotenv";
+import { WebSocketServer } from "ws";
 
 dotenv.config();
 
@@ -586,8 +587,66 @@ async function start() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const httpServer = app.listen(PORT, "0.0.0.0", () => {
     console.log(`[JARVIS Partner Core] Server listening on http://0.0.0.0:${PORT}`);
+  });
+
+  // Setup WebSocket Server for Live API
+  const wss = new WebSocketServer({ server: httpServer, path: "/live" });
+
+  wss.on("connection", async (clientWs) => {
+    const ai = getGemini();
+    if (!ai) {
+      console.warn("No Gemini API key available for Live API.");
+      clientWs.close();
+      return;
+    }
+
+    try {
+      const session = await ai.live.connect({
+        model: "gemini-3.1-flash-live-preview",
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
+          },
+          systemInstruction: "You are JARVIS, an erudite British butler with dry wit and an economy of words. Provide ultra-concise, sharp answers in 1 to 2 sentences.",
+        },
+        callbacks: {
+          onmessage: (message: LiveServerMessage) => {
+            const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+            if (audio) {
+              clientWs.send(JSON.stringify({ audio }));
+            }
+            if (message.serverContent?.interrupted) {
+              clientWs.send(JSON.stringify({ interrupted: true }));
+            }
+          },
+        },
+      });
+
+      clientWs.on("message", (data) => {
+        try {
+          const { audio } = JSON.parse(data.toString());
+          if (audio) {
+            session.sendRealtimeInput({
+              audio: { data: audio, mimeType: "audio/pcm;rate=16000" },
+            });
+          }
+        } catch (e) {
+          console.error("Live API WS message error", e);
+        }
+      });
+      
+      clientWs.on("close", () => {
+        console.log("Client disconnected from Live API");
+        session.close();
+      });
+
+    } catch (err) {
+      console.error("Failed to connect to Live API", err);
+      clientWs.close();
+    }
   });
 }
 

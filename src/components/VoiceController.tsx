@@ -29,184 +29,181 @@ export const VoiceController: React.FC<VoiceControllerProps> = ({
   const [selectedVoiceName, setSelectedVoiceName] = useState<string>('Google UK English Male');
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  const recognitionRef = useRef<any>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const inputAudioCtxRef = useRef<AudioContext | null>(null);
+  const outputAudioCtxRef = useRef<AudioContext | null>(null);
+  const nextPlaybackTimeRef = useRef(0);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const micStreamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // Initialize Speech Synthesis voices
-  useEffect(() => {
-    const updateVoices = () => {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        const voices = window.speechSynthesis.getVoices();
-        setAvailableVoices(voices);
-        const britishVoice = voices.find(v => v.lang.includes('en-GB') || v.name.toLowerCase().includes('british') || v.name.toLowerCase().includes('uk'));
-        if (britishVoice) {
-          setSelectedVoiceName(britishVoice.name);
-        }
-      }
-    };
-
-    updateVoices();
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = updateVoices;
+  // PCM Encoder
+  const pcmToBase64 = (pcmData: Float32Array): string => {
+    const buffer = new ArrayBuffer(pcmData.length * 2);
+    const view = new DataView(buffer);
+    for (let i = 0; i < pcmData.length; i++) {
+      let s = Math.max(-1, Math.min(1, pcmData[i]));
+      s = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      view.setInt16(i * 2, s, true);
     }
-  }, []);
-
-  // Web Speech Recognition Setup
-  useEffect(() => {
-    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const rec = new SpeechRecognition();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-GB';
-
-      rec.onresult = (event: any) => {
-        const results = event.results;
-        const latest = results[results.length - 1];
-        const transcript = latest[0].transcript;
-
-        // If AI is currently speaking and user speaks, trigger Barge-in!
-        if (isSpeaking && transcript.trim().length > 2) {
-          handleTriggerBargeIn(transcript);
-        }
-
-        if (latest.isFinal) {
-          onSpeechInput(transcript);
-        }
-      };
-
-      rec.onerror = (err: any) => {
-        console.warn("Speech recognition error:", err);
-      };
-
-      recognitionRef.current = rec;
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
-  }, [isSpeaking]);
+    return btoa(binary);
+  };
 
-  // Voice playback with British Butler personality
-  useEffect(() => {
-    if (!activeSpeechText || !speechSynthesisEnabled) return;
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(activeSpeechText);
-    const chosenVoice = availableVoices.find(v => v.name === selectedVoiceName) || availableVoices.find(v => v.lang.includes('en-GB'));
-    if (chosenVoice) {
-      utterance.voice = chosenVoice;
+  // Audio Decoder & Player
+  const playAudioChunk = (ctx: AudioContext, base64Audio: string) => {
+    if (!speechSynthesisEnabled) return;
+    const binary = atob(base64Audio);
+    const length = binary.length / 2;
+    const audioBuffer = ctx.createBuffer(1, length, 24000);
+    const channelData = audioBuffer.getChannelData(0);
+    const view = new DataView(new ArrayBuffer(binary.length));
+    for (let i = 0; i < binary.length; i++) {
+      view.setUint8(i, binary.charCodeAt(i));
     }
-    utterance.rate = 1.05; // Crisp butler cadence
-    utterance.pitch = 0.95; // Dignified low pitch
-
-    utterance.onstart = () => {
-      onStateChange('speaking');
-    };
-
-    utterance.onend = () => {
-      if (agentState === 'speaking') {
+    for (let i = 0; i < length; i++) {
+      channelData[i] = view.getInt16(i * 2, true) / 0x8000;
+    }
+    
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(ctx.destination);
+    
+    if (nextPlaybackTimeRef.current < ctx.currentTime) {
+      nextPlaybackTimeRef.current = ctx.currentTime;
+    }
+    source.start(nextPlaybackTimeRef.current);
+    nextPlaybackTimeRef.current += audioBuffer.duration;
+    
+    activeSourcesRef.current.push(source);
+    source.onended = () => {
+      activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+      if (activeSourcesRef.current.length === 0) {
         onStateChange('idle');
       }
     };
+    onStateChange('speaking');
+  };
 
-    utterance.onerror = () => {
-      if (agentState === 'speaking') {
-        onStateChange('idle');
-      }
-    };
+  const handleTriggerBargeIn = (interruptingPrompt?: string) => {
+    // 1. Cancel audio playback immediately
+    activeSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch(e) {}
+    });
+    activeSourcesRef.current = [];
+    nextPlaybackTimeRef.current = 0;
 
-    window.speechSynthesis.speak(utterance);
+    // 2. Log Barge-in UI
+    setLastReconciliation(`[BARGE-IN TRIGGERED: "${interruptingPrompt || 'User interruption'}"]`);
+    setInterruptionCount(prev => prev + 1);
 
-    return () => {
-      window.speechSynthesis.cancel();
-    };
-  }, [activeSpeechText, speechSynthesisEnabled, selectedVoiceName, availableVoices]);
+    // 3. Inform parent
+    onBargeIn();
+  };
 
   const toggleListening = async () => {
     if (isListening) {
       // Stop listening
       setIsListening(false);
       onStateChange('idle');
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+      
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      if (inputAudioCtxRef.current) {
+        inputAudioCtxRef.current.close();
+        inputAudioCtxRef.current = null;
       }
       if (micStreamRef.current) {
         micStreamRef.current.getTracks().forEach(t => t.stop());
         micStreamRef.current = null;
+      }
+      if (outputAudioCtxRef.current) {
+        outputAudioCtxRef.current.close();
+        outputAudioCtxRef.current = null;
       }
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
       setMicVolume(0);
     } else {
-      // Start listening
+      // Start listening via Gemini Live API WebSocket
       try {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/live`);
+        wsRef.current = ws;
+
+        const inputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+        inputAudioCtxRef.current = inputAudioCtx;
+        
+        const outputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        outputAudioCtxRef.current = outputAudioCtx;
+
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         micStreamRef.current = stream;
         setIsListening(true);
         onStateChange('listening');
 
-        // Audio Meter for VAD
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        audioContextRef.current = audioCtx;
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
+        // Setup Mic capture
+        const source = inputAudioCtx.createMediaStreamSource(stream);
+        const processor = inputAudioCtx.createScriptProcessor(4096, 1, 1);
+        source.connect(processor);
+        processor.connect(inputAudioCtx.destination);
+
+        processor.onaudioprocess = (e) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            const base64 = pcmToBase64(e.inputBuffer.getChannelData(0));
+            ws.send(JSON.stringify({ audio: base64 }));
+          }
+        };
+
+        // Output Handling
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data);
+          if (msg.audio) {
+            playAudioChunk(outputAudioCtx, msg.audio);
+          }
+          if (msg.interrupted) {
+            handleTriggerBargeIn("Model interrupted");
+          }
+        };
+        
+        ws.onerror = (e) => console.error("Live API WS Error", e);
+        ws.onclose = () => {
+          console.log("Live API WS closed");
+          setIsListening(false);
+        };
+
+        // Simple volume meter for UI
+        const analyser = inputAudioCtx.createAnalyser();
         analyser.fftSize = 256;
         source.connect(analyser);
-        analyserRef.current = analyser;
-
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
-
         const checkAudio = () => {
           analyser.getByteFrequencyData(dataArray);
           let sum = 0;
-          for (let i = 0; i < bufferLength; i++) {
-            sum += dataArray[i];
+          for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
+          const vol = sum / bufferLength / 255;
+          setMicVolume(vol);
+          
+          if (vol > vadThreshold && agentState === 'speaking') {
+             handleTriggerBargeIn("User interjection via VAD");
           }
-          const avg = sum / bufferLength / 255;
-          setMicVolume(avg);
-
-          // Neural VAD threshold check
-          if (avg > vadThreshold && isSpeaking) {
-            handleTriggerBargeIn("User interjection detected by Silero VAD");
-          }
-
+          
           animFrameRef.current = requestAnimationFrame(checkAudio);
         };
         checkAudio();
 
-        if (recognitionRef.current) {
-          recognitionRef.current.start();
-        }
       } catch (err) {
-        console.error("Microphone access failed:", err);
-        // Simulate listening if mic permission denied in iframe
-        setIsListening(true);
-        onStateChange('listening');
-        const interval = setInterval(() => {
-          setMicVolume(0.2 + Math.random() * 0.4);
-        }, 150);
-        setTimeout(() => clearInterval(interval), 10000);
+        console.error("Failed to start Live API:", err);
       }
     }
-  };
-
-  const handleTriggerBargeIn = (interruptingPrompt?: string) => {
-    // 1. Cancel audio playback immediately
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    // 2. Compute context reconciliation
-    const words = activeSpeechText.split(' ');
-    const heardPortion = words.slice(0, Math.max(3, Math.floor(words.length * 0.4))).join(' ');
-    const reconciled = `Heard by user: "${heardPortion}..." [CUT OFF BY BARGE-IN: "${interruptingPrompt || 'User interruption'}"]`;
-    setLastReconciliation(reconciled);
-    setInterruptionCount(prev => prev + 1);
-
-    // 3. Trigger parent barge-in
-    onBargeIn();
   };
 
   // 635ms Cascaded Latency Budget Specs
