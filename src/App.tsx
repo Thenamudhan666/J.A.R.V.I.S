@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 
 // Extracted for animejs entrance tracking
-const AnimatedMessage = ({ msg }: { msg: ChatMessage }) => {
+const AnimatedMessage: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

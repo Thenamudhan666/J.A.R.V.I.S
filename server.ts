@@ -218,7 +218,7 @@ User statement: ${message}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.6-flash",
       contents: prompt,
       config: {
         systemInstruction,
@@ -228,7 +228,7 @@ User statement: ${message}`;
 
     const text = response.text || "Pardon me, sir. My cognitive pipeline encountered an anomaly.";
     const actions = parseActionTags(text);
-    res.json({ text, actions, source: "gemini-2.0-flash" });
+    res.json({ text, actions, source: "gemini-3.6-flash" });
   } catch (error: any) {
     console.error("Converse Error:", error);
     res.status(500).json({ error: error.message || "Failed to generate conversational response" });
@@ -277,7 +277,7 @@ Return STRICT JSON matching the schema.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.6-flash",
       contents: `Evaluate this proposition in the domain of "${domain}":\n"${proposition}"`,
       config: {
         systemInstruction,
@@ -335,7 +335,7 @@ Return STRICT JSON matching the schema.`;
     });
 
     const parsed = JSON.parse(response.text || "{}");
-    res.json({ ...parsed, source: "gemini-2.0-flash" });
+    res.json({ ...parsed, source: "gemini-3.6-flash" });
   } catch (error: any) {
     console.error("Socratic Graph Error:", error);
     res.status(500).json({ error: error.message || "Failed to generate Socratic analysis graph" });
@@ -366,7 +366,7 @@ app.post("/api/gemini/deliberate", async (req, res) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.6-flash",
       contents: `Deliberate internally on topic: "${topic}". Additional context: "${context}".`,
       config: {
         systemInstruction,
@@ -391,7 +391,7 @@ app.post("/api/gemini/deliberate", async (req, res) => {
     });
 
     const parsed = JSON.parse(response.text || "{}");
-    res.json({ ...parsed, source: "gemini-2.0-flash" });
+    res.json({ ...parsed, source: "gemini-3.6-flash" });
   } catch (error: any) {
     console.error("Deliberation Error:", error);
     res.status(500).json({ error: error.message || "Failed to simulate internal multi-agent deliberation" });
@@ -430,7 +430,7 @@ Determine:
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.6-flash",
       contents: `Analyze context:
 - Active Window: ${activeWindow}
 - Stagnation Duration: ${stagnationDurationSec}s
@@ -461,7 +461,7 @@ Determine:
         stagnationDuration: `${Math.round(stagnationDurationSec / 60)} minutes`,
         focusTarget: activeWindow,
       },
-      source: "gemini-2.0-flash",
+      source: "gemini-3.6-flash",
     });
   } catch (error: any) {
     console.error("Supervisor Error:", error);
@@ -530,7 +530,7 @@ export function solveIntervalPartition(arr: number[]): number {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.6-flash",
       contents: `Synthesize Voyager skill for problem: "${problemSolved}".\nWorking solution:\n${solutionCode}`,
       config: {
         systemInstruction,
@@ -563,7 +563,7 @@ export function solveIntervalPartition(arr: number[]): number {
       ...parsed,
       vaultSaved: true,
       unitTestsPassed: true,
-      source: "gemini-2.0-flash",
+      source: "gemini-3.6-flash",
     });
   } catch (error: any) {
     console.error("Voyager Error:", error);
@@ -608,7 +608,7 @@ async function start() {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
           },
           systemInstruction: "You are JARVIS, an erudite British butler with dry wit and an economy of words. Provide ultra-concise, sharp answers in 1 to 2 sentences.",
         },
