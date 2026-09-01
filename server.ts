@@ -218,7 +218,7 @@ User statement: ${message}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.7-flash",
       contents: prompt,
       config: {
         systemInstruction,
@@ -228,10 +228,10 @@ User statement: ${message}`;
 
     const text = response.text || "Pardon me, sir. My cognitive pipeline encountered an anomaly.";
     const actions = parseActionTags(text);
-    res.json({ text, actions, source: "gemini-3.6-flash" });
+    res.json({ text, actions, source: "gemini-3.7-flash" });
   } catch (error: any) {
     console.error("Converse Error:", error);
-    res.status(500).json({ error: error.message || "Failed to generate conversational response" });
+    res.status(500).json({ error: typeof error.message || "Failed to generate conversational response" === 'string' ? error.message || "Failed to generate conversational response" : (error.message || "Failed to generate conversational response"?.message || 'Internal Server Error') });
   }
 });
 
@@ -277,7 +277,7 @@ Return STRICT JSON matching the schema.`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.7-flash",
       contents: `Evaluate this proposition in the domain of "${domain}":\n"${proposition}"`,
       config: {
         systemInstruction,
@@ -335,10 +335,10 @@ Return STRICT JSON matching the schema.`;
     });
 
     const parsed = JSON.parse(response.text || "{}");
-    res.json({ ...parsed, source: "gemini-3.6-flash" });
+    res.json({ ...parsed, source: "gemini-3.7-flash" });
   } catch (error: any) {
     console.error("Socratic Graph Error:", error);
-    res.status(500).json({ error: error.message || "Failed to generate Socratic analysis graph" });
+    res.status(500).json({ error: typeof error.message || "Failed to generate Socratic analysis graph" === 'string' ? error.message || "Failed to generate Socratic analysis graph" : (error.message || "Failed to generate Socratic analysis graph"?.message || 'Internal Server Error') });
   }
 });
 
@@ -366,7 +366,7 @@ app.post("/api/gemini/deliberate", async (req, res) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.7-flash",
       contents: `Deliberate internally on topic: "${topic}". Additional context: "${context}".`,
       config: {
         systemInstruction,
@@ -391,10 +391,10 @@ app.post("/api/gemini/deliberate", async (req, res) => {
     });
 
     const parsed = JSON.parse(response.text || "{}");
-    res.json({ ...parsed, source: "gemini-3.6-flash" });
+    res.json({ ...parsed, source: "gemini-3.7-flash" });
   } catch (error: any) {
     console.error("Deliberation Error:", error);
-    res.status(500).json({ error: error.message || "Failed to simulate internal multi-agent deliberation" });
+    res.status(500).json({ error: typeof error.message || "Failed to simulate internal multi-agent deliberation" === 'string' ? error.message || "Failed to simulate internal multi-agent deliberation" : (error.message || "Failed to simulate internal multi-agent deliberation"?.message || 'Internal Server Error') });
   }
 });
 
@@ -430,7 +430,7 @@ Determine:
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.7-flash",
       contents: `Analyze context:
 - Active Window: ${activeWindow}
 - Stagnation Duration: ${stagnationDurationSec}s
@@ -461,11 +461,11 @@ Determine:
         stagnationDuration: `${Math.round(stagnationDurationSec / 60)} minutes`,
         focusTarget: activeWindow,
       },
-      source: "gemini-3.6-flash",
+      source: "gemini-3.7-flash",
     });
   } catch (error: any) {
     console.error("Supervisor Error:", error);
-    res.status(500).json({ error: error.message || "Failed to evaluate supervisor heuristics" });
+    res.status(500).json({ error: typeof error.message || "Failed to evaluate supervisor heuristics" === 'string' ? error.message || "Failed to evaluate supervisor heuristics" : (error.message || "Failed to evaluate supervisor heuristics"?.message || 'Internal Server Error') });
   }
 });
 
@@ -530,7 +530,7 @@ export function solveIntervalPartition(arr: number[]): number {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.7-flash",
       contents: `Synthesize Voyager skill for problem: "${problemSolved}".\nWorking solution:\n${solutionCode}`,
       config: {
         systemInstruction,
@@ -563,11 +563,11 @@ export function solveIntervalPartition(arr: number[]): number {
       ...parsed,
       vaultSaved: true,
       unitTestsPassed: true,
-      source: "gemini-3.6-flash",
+      source: "gemini-3.7-flash",
     });
   } catch (error: any) {
     console.error("Voyager Error:", error);
-    res.status(500).json({ error: error.message || "Failed to synthesize Voyager skill" });
+    res.status(500).json({ error: typeof error.message || "Failed to synthesize Voyager skill" === 'string' ? error.message || "Failed to synthesize Voyager skill" : (error.message || "Failed to synthesize Voyager skill"?.message || 'Internal Server Error') });
   }
 });
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Database, FileText, Search, Plus, Save, Trash2, Shield, BookOpen, Target, Sparkles } from 'lucide-react';
 import { VaultFile } from '../types';
+import { WorkspaceIntegrationPanel } from './WorkspaceIntegrationPanel';
+import { ObsidianPanel } from './ObsidianPanel';
 
 interface MemoryVaultViewerProps {
   onFileSaved?: () => void;
@@ -12,7 +14,7 @@ export const MemoryVaultViewer: React.FC<MemoryVaultViewerProps> = ({ onFileSave
   const [selectedFile, setSelectedFile] = useState<VaultFile | null>(null);
   const [editedContent, setEditedContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'files' | 'student-nus'>('files');
+  const [activeTab, setActiveTab] = useState<'files' | 'student-nus' | 'workspace' | 'obsidian'>('obsidian');
 
   // Slash command inputs for nūs student integration
   const [slashInput, setSlashInput] = useState('');
@@ -125,6 +127,7 @@ export const MemoryVaultViewer: React.FC<MemoryVaultViewerProps> = ({ onFileSave
           >
             Vault Explorer
           </button>
+          
           <button
             onClick={() => setActiveTab('student-nus')}
             className={`px-3 py-1 transition-all ${
@@ -133,6 +136,25 @@ export const MemoryVaultViewer: React.FC<MemoryVaultViewerProps> = ({ onFileSave
           >
             nūs Student Core
           </button>
+          
+          <button
+            onClick={() => setActiveTab('workspace')}
+            className={`px-3 py-1 transition-all ${
+              activeTab === 'workspace' ? 'bg-[#00f0ff] text-black' : 'text-[#666] hover:text-[#00f0ff]'
+            }`}
+          >
+            Workspace
+          </button>
+          <button
+            onClick={() => setActiveTab('obsidian')}
+            className={`px-3 py-1 transition-all ${
+              activeTab === 'obsidian' ? 'bg-[#a855f7] text-black' : 'text-[#666] hover:text-[#a855f7]'
+            }`}
+          >
+            Obsidian (Local)
+          </button>
+
+
         </div>
       </div>
 
@@ -256,6 +278,12 @@ export const MemoryVaultViewer: React.FC<MemoryVaultViewerProps> = ({ onFileSave
           </div>
         </div>
       )}
+    
+      {/* Tab: Workspace */}
+      {activeTab === 'workspace' && <WorkspaceIntegrationPanel />}
+    
+      {/* Tab: Obsidian */}
+      {activeTab === 'obsidian' && <ObsidianPanel />}
     </div>
   );
 };
