@@ -3,6 +3,7 @@ import { Database, FileText, Search, Plus, Save, Trash2, Shield, BookOpen, Targe
 import { VaultFile } from '../types';
 import { WorkspaceIntegrationPanel } from './WorkspaceIntegrationPanel';
 import { ObsidianPanel } from './ObsidianPanel';
+import { StudyAnalyzerPanel } from './StudyAnalyzerPanel';
 
 interface MemoryVaultViewerProps {
   onFileSaved?: () => void;
@@ -14,7 +15,7 @@ export const MemoryVaultViewer: React.FC<MemoryVaultViewerProps> = ({ onFileSave
   const [selectedFile, setSelectedFile] = useState<VaultFile | null>(null);
   const [editedContent, setEditedContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'files' | 'student-nus' | 'workspace' | 'obsidian'>('obsidian');
+  const [activeTab, setActiveTab] = useState<'files' | 'student-nus' | 'workspace' | 'obsidian' | 'study-lab'>('obsidian');
 
   // Slash command inputs for nūs student integration
   const [slashInput, setSlashInput] = useState('');
@@ -145,6 +146,7 @@ export const MemoryVaultViewer: React.FC<MemoryVaultViewerProps> = ({ onFileSave
           >
             Workspace
           </button>
+          
           <button
             onClick={() => setActiveTab('obsidian')}
             className={`px-3 py-1 transition-all ${
@@ -153,6 +155,15 @@ export const MemoryVaultViewer: React.FC<MemoryVaultViewerProps> = ({ onFileSave
           >
             Obsidian (Local)
           </button>
+          <button
+            onClick={() => setActiveTab('study-lab')}
+            className={`px-3 py-1 transition-all ${
+              activeTab === 'study-lab' ? 'bg-[#f59e0b] text-black' : 'text-[#666] hover:text-[#f59e0b]'
+            }`}
+          >
+            Study Lab
+          </button>
+
 
 
         </div>
@@ -282,8 +293,13 @@ export const MemoryVaultViewer: React.FC<MemoryVaultViewerProps> = ({ onFileSave
       {/* Tab: Workspace */}
       {activeTab === 'workspace' && <WorkspaceIntegrationPanel />}
     
+      
       {/* Tab: Obsidian */}
       {activeTab === 'obsidian' && <ObsidianPanel />}
+
+      {/* Tab: Study Lab */}
+      {activeTab === 'study-lab' && <StudyAnalyzerPanel />}
+
     </div>
   );
 };

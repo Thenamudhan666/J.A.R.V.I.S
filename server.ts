@@ -131,6 +131,45 @@ function parseActionTags(text: string) {
 }
 
 // API: Health
+
+// API: Study Analyzer
+app.post("/api/gemini/study-analysis", async (req, res) => {
+  const { filename, content } = req.body;
+  const ai = getGemini();
+  if (!ai) return res.status(500).json({ error: "Gemini API key missing" });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Analyze this study material. Filename: ${filename}\n\nContent:\n${content.substring(0, 30000)}`,
+      config: {
+        systemInstruction: "You are JARVIS, a highly advanced Socratic tutor. Analyze the provided text and output a JSON object containing a study guide.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING, description: "A concise summary of the core topic." },
+            keyConcepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3-5 crucial vocabulary terms or concepts explained." },
+            socraticQuestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 probing Socratic questions designed to test the user's deep understanding." }
+          },
+          required: ["summary", "keyConcepts", "socraticQuestions"]
+        }
+      }
+    });
+    
+    let text = response.text || "{}";
+    // Sometimes the model might wrap in markdown backticks
+    if (text.startsWith("```json")) {
+        text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    }
+    const parsed = JSON.parse(text);
+    res.json(parsed);
+  } catch (error: any) {
+    console.error("Study Analysis Error:", error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
@@ -231,7 +270,7 @@ User statement: ${message}`;
     res.json({ text, actions, source: "gemini-3.7-flash" });
   } catch (error: any) {
     console.error("Converse Error:", error);
-    res.status(500).json({ error: typeof error.message || "Failed to generate conversational response" === 'string' ? error.message || "Failed to generate conversational response" : (error.message || "Failed to generate conversational response"?.message || 'Internal Server Error') });
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -338,7 +377,7 @@ Return STRICT JSON matching the schema.`;
     res.json({ ...parsed, source: "gemini-3.7-flash" });
   } catch (error: any) {
     console.error("Socratic Graph Error:", error);
-    res.status(500).json({ error: typeof error.message || "Failed to generate Socratic analysis graph" === 'string' ? error.message || "Failed to generate Socratic analysis graph" : (error.message || "Failed to generate Socratic analysis graph"?.message || 'Internal Server Error') });
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -394,7 +433,7 @@ app.post("/api/gemini/deliberate", async (req, res) => {
     res.json({ ...parsed, source: "gemini-3.7-flash" });
   } catch (error: any) {
     console.error("Deliberation Error:", error);
-    res.status(500).json({ error: typeof error.message || "Failed to simulate internal multi-agent deliberation" === 'string' ? error.message || "Failed to simulate internal multi-agent deliberation" : (error.message || "Failed to simulate internal multi-agent deliberation"?.message || 'Internal Server Error') });
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -465,7 +504,7 @@ Determine:
     });
   } catch (error: any) {
     console.error("Supervisor Error:", error);
-    res.status(500).json({ error: typeof error.message || "Failed to evaluate supervisor heuristics" === 'string' ? error.message || "Failed to evaluate supervisor heuristics" : (error.message || "Failed to evaluate supervisor heuristics"?.message || 'Internal Server Error') });
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -567,7 +606,7 @@ export function solveIntervalPartition(arr: number[]): number {
     });
   } catch (error: any) {
     console.error("Voyager Error:", error);
-    res.status(500).json({ error: typeof error.message || "Failed to synthesize Voyager skill" === 'string' ? error.message || "Failed to synthesize Voyager skill" : (error.message || "Failed to synthesize Voyager skill"?.message || 'Internal Server Error') });
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -639,8 +678,8 @@ async function start() {
               audio: { data: audio, mimeType: "audio/pcm;rate=16000" },
             });
           }
-        } catch (e) {
-          console.error("Live API WS message error", e); 
+        } catch (error: any) {
+          console.error("Live API WS message error", error); 
         }
       });
       
@@ -649,8 +688,8 @@ async function start() {
         session.close();
       });
 
-    } catch (err) {
-      console.error("Failed to connect to Live API", err);
+    } catch (error: any) {
+      console.error("Failed to connect to Live API", error);
       clientWs.close();
     }
   });
